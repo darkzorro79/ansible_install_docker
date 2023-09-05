@@ -1,0 +1,44 @@
+---
+- name: Install docker + docker-compose
+  hosts: work2
+  become: yes
+  tasks:
+    - name: Run the equivalent of "apt-get update" as a separate step
+      ansible.builtin.apt:
+        update_cache: yes
+    - name: install impotent packege
+      ansible.builtin.apt:
+        pkg:
+        - ca-certificates 
+        - curl 
+        - gnupg
+    - name: Add Docker’s official GPG key
+      ansible.builtin.shell: |
+        sudo install -m 0755 -d /etc/apt/keyrings 
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 
+        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      args:
+        executable: /bin/bash
+    - name: Run the equivalent of "apt-get update" as a separate step
+      ansible.builtin.apt:
+        update_cache: yes
+    - name: Install docker
+      ansible.builtin.apt:
+        pkg:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io 
+        - docker-buildx-plugin 
+        - docker-compose-plugin
+    - name: start docker
+      ansible.builtin.shell: |
+        sudo systemctl enable --now docker
+      args:
+        executable: /bin/bash
+    - name: Install docker-compose
+      ansible.builtin.shell: |
+        sudo curl -L https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+      args:
+        executable: /bin/bash
