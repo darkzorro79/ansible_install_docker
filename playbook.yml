@@ -1,0 +1,90 @@
+---
+- name: Install docker + docker-compose
+  hosts: stockparser-arka
+  become: yes
+  tasks:
+  - block:    # ===== Block for UBUNTU =====
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: install impotent packege
+        ansible.builtin.apt:
+          pkg:
+          - ca-certificates 
+          - curl 
+          - gnupg
+      - name: Add Docker’s official GPG key
+        ansible.builtin.shell: |
+          sudo install -m 0755 -d /etc/apt/keyrings 
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        args:
+          executable: /bin/bash
+      #- name: Copy repo
+      #  get_url:
+      #    url: https://conf.sw-repo.mercury.ru/ubuntu/22-jammy/docker/docker.list 
+      #    dest: /etc/apt/sources.list.d/docker.list 
+      #    mode: 0644 
+      #    validate_certs: false
+      #- name: add Docker’s official GPG key
+      #  get_url:
+      #    url: https://conf.sw-repo.mercury.ru/ubuntu/22-jammy/docker/docker-archive-keyring.gpg
+      #    dest: /usr/share/keyrings/docker-archive-keyring.gpg
+      #    mode: 0644
+      #    validate_certs: false
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: Install docker
+        ansible.builtin.apt:
+          pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io 
+          - docker-buildx-plugin 
+          - docker-compose-plugin
+    when: ansible_os_family == "Debian"
+  - block:  # ===== Block for CentOS 8 Stream =====
+      - name: Install impotent packege
+        ansible.builtin.yum:
+          name: yum-utils
+          state: latest
+      - name: Add repo docker 
+        ansible.builtin.shell: |
+          sudo yum install -y yum-utils
+          sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        args:
+          executable: /bin/bash
+      #  get_url: 
+      #    url: https://conf.sw-repo.mercury.ru/centos/8/docker-ce.repo
+      #    dest: /etc/yum.repos.d/docker-ce.repo
+      #    mode: 0644
+      #    validate_certs: false
+      - name: Install docker
+        ansible.builtin.yum:
+          name:
+            - docker-ce 
+            - docker-ce-cli 
+            - containerd.io 
+            - docker-buildx-plugin 
+            - docker-compose-plugin
+          state: latest   
+    when: ansible_os_family == "RedHat"
+  - name: start docker
+    ansible.builtin.shell: |
+      sudo systemctl enable --now docker
+    args:
+      executable: /bin/bash
+  - name: Install docker-compose
+    ansible.builtin.shell: |
+      sudo curl -L https://github.com/docker/compose/releases/download/v2.24.3/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+      sudo chmod +x /usr/local/bin/docker-compose
+    args:
+      executable: /bin/bash
+  #- name: Install docker-compose
+  #  get_url:
+  #    url: https://conf.sw-repo.mercury.ru/ubuntu/22-jammy/docker/docker-compose
+  #    dest: /usr/local/bin/docker-compose
+  #    mode: 0755
+  #    validate_certs: false
