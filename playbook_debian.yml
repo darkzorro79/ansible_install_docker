@@ -1,6 +1,6 @@
 ---
 - name: Install docker + docker-compose
-  hosts: deb12pg
+  hosts: ansible
   become: yes
   tasks:
     - name: Run the equivalent of "apt-get update" as a separate step
