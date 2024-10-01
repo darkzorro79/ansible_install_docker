@@ -1,6 +1,6 @@
 ---
 - name: Install docker + docker-compose
-  hosts: ansible
+  hosts: vpn_fvds
   become: yes
   tasks:
     - name: Run the equivalent of "apt-get update" as a separate step
@@ -38,7 +38,7 @@
         executable: /bin/bash
     - name: Install docker-compose
       ansible.builtin.shell: |
-        sudo curl -L https://github.com/docker/compose/releases/download/v2.23.3/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+        sudo curl -L https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
         sudo chmod +x /usr/local/bin/docker-compose
       args:
         executable: /bin/bash
