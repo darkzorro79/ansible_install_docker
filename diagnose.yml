@@ -1,0 +1,38 @@
+---
+- name: Diagnose Ansible and SSL issues
+  hosts: localhost
+  gather_facts: yes
+  tasks:
+  - name: Check Python version
+    debug:
+      msg: "Python version: {{ ansible_python_version }}"
+      
+  - name: Check Ansible version
+    shell: ansible --version
+    register: ansible_version
+    
+  - name: Display Ansible version
+    debug:
+      var: ansible_version.stdout_lines
+      
+  - name: Check installed Python packages
+    shell: |
+      echo "=== pip3 packages ==="
+      pip3 list | grep -E "(urllib3|requests|ssl|ansible)"
+      echo "=== system packages ==="
+      python3 -c "import ssl; print('SSL support:', ssl.OPENSSL_VERSION)"
+    register: packages_info
+    ignore_errors: yes
+    
+  - name: Display packages info
+    debug:
+      var: packages_info.stdout_lines
+      
+  - name: Test simple curl to GitHub API
+    shell: curl -s https://api.github.com/repos/docker/compose/releases/latest | head -10
+    register: curl_test
+    ignore_errors: yes
+    
+  - name: Display curl test result
+    debug:
+      var: curl_test.stdout_lines 

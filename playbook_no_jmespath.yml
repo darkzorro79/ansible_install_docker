@@ -1,0 +1,108 @@
+---
+- name: Install docker + docker-compose (without jmespath)
+  hosts: template
+  become: yes
+  tasks:
+  - block:    # ===== Block for UBUNTU =====
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: install important packages
+        ansible.builtin.apt:
+          pkg:
+          - ca-certificates 
+          - curl 
+          - gnupg
+      - name: Add Docker's official GPG key for Ubuntu
+        ansible.builtin.shell: |
+          sudo install -m 0755 -d /etc/apt/keyrings 
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        args:
+          executable: /bin/bash
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: Install docker
+        ansible.builtin.apt:
+          pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io 
+          - docker-buildx-plugin 
+          - docker-compose-plugin
+    when: ansible_distribution == "Ubuntu"
+    
+  - block:    # ===== Block for DEBIAN =====
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: install important packages
+        ansible.builtin.apt:
+          pkg:
+          - ca-certificates 
+          - curl 
+          - gnupg
+      - name: Add Docker's official GPG key for Debian
+        ansible.builtin.shell: |
+          sudo install -m 0755 -d /etc/apt/keyrings 
+          curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        args:
+          executable: /bin/bash
+      - name: Run the equivalent of "apt-get update" as a separate step
+        ansible.builtin.apt:
+          update_cache: yes
+      - name: Install docker
+        ansible.builtin.apt:
+          pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io 
+          - docker-buildx-plugin 
+          - docker-compose-plugin
+    when: ansible_distribution == "Debian"
+    
+  - block:  # ===== Block for CentOS 8 Stream =====
+      - name: Install important packages
+        ansible.builtin.yum:
+          name: yum-utils
+          state: latest
+      - name: Add repo docker 
+        ansible.builtin.shell: |
+          sudo yum install -y yum-utils
+          sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+        args:
+          executable: /bin/bash
+      - name: Install docker
+        ansible.builtin.yum:
+          name:
+            - docker-ce 
+            - docker-ce-cli 
+            - containerd.io 
+            - docker-buildx-plugin 
+            - docker-compose-plugin
+          state: latest   
+    when: ansible_os_family == "RedHat"
+    
+  - name: start docker
+    ansible.builtin.shell: |
+      sudo systemctl enable --now docker
+    args:
+      executable: /bin/bash
+      
+  # Простой способ получения последней версии без jmespath
+  - name: Get latest docker-compose version 
+    uri:
+      url: https://api.github.com/repos/docker/compose/releases/latest
+      return_content: yes
+    register: docker_compose_release
+
+  - name: Install docker-compose
+    ansible.builtin.shell: |
+      sudo curl -L https://github.com/docker/compose/releases/download/{{ docker_compose_release.json.tag_name }}/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+      sudo chmod +x /usr/local/bin/docker-compose
+    args:
+      executable: /bin/bash 

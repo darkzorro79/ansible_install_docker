@@ -1,0 +1,144 @@
+---
+- name: Install docker + docker-compose (Universal)
+  hosts: template
+  become: yes
+  vars:
+    # Маппинг дистрибутивов на их Docker репозитории
+    docker_repo_map:
+      Ubuntu: "ubuntu"
+      Debian: "debian"
+      CentOS: "centos"
+      "Rocky Linux": "centos"
+      "AlmaLinux": "centos"
+      Fedora: "fedora"
+    # Фолбэк версия если API недоступен
+    fallback_docker_compose_version: "v2.36.0"
+  
+  tasks:
+  - name: Display OS information
+    debug:
+      msg: |
+        OS Family: {{ ansible_os_family }}
+        Distribution: {{ ansible_distribution }}
+        Version: {{ ansible_distribution_version }}
+        Codename: {{ ansible_distribution_release }}
+
+  # Очистка старых установок
+  - name: Remove old Docker repository files
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/apt/sources.list.d/docker.list
+      - /etc/apt/keyrings/docker.gpg
+      - /usr/share/keyrings/docker-archive-keyring.gpg
+    when: ansible_os_family == "Debian"
+
+  # ===== Block for APT-based systems (Ubuntu, Debian) =====
+  - block:
+      - name: Update apt cache
+        ansible.builtin.apt:
+          update_cache: yes
+          
+      - name: Install required packages
+        ansible.builtin.apt:
+          pkg:
+          - ca-certificates 
+          - curl 
+          - gnupg
+          - lsb-release
+          
+      - name: Create keyrings directory
+        ansible.builtin.file:
+          path: /etc/apt/keyrings
+          state: directory
+          mode: '0755'
+          
+      - name: Add Docker's GPG key
+        ansible.builtin.shell: |
+          curl -fsSL https://download.docker.com/linux/{{ docker_repo_map[ansible_distribution] }}/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          chmod a+r /etc/apt/keyrings/docker.gpg
+        args:
+          executable: /bin/bash
+          
+      - name: Add Docker repository
+        ansible.builtin.shell: |
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ docker_repo_map[ansible_distribution] }} $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        args:
+          executable: /bin/bash
+          
+      - name: Update apt cache after adding repository
+        ansible.builtin.apt:
+          update_cache: yes
+          
+      - name: Install Docker packages
+        ansible.builtin.apt:
+          pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io 
+          - docker-buildx-plugin 
+          - docker-compose-plugin
+          state: present
+    when: ansible_os_family == "Debian"
+
+  # ===== Block for YUM/DNF-based systems (CentOS, RHEL, Rocky, Alma, Fedora) =====
+  - block:
+      - name: Install required packages for RHEL-based systems
+        ansible.builtin.package:
+          name: 
+            - yum-utils
+            - device-mapper-persistent-data
+            - lvm2
+          state: present
+          
+      - name: Add Docker repository for RHEL-based systems
+        ansible.builtin.shell: |
+          yum-config-manager --add-repo https://download.docker.com/linux/{{ docker_repo_map[ansible_distribution] | default('centos') }}/docker-ce.repo
+        args:
+          executable: /bin/bash
+          
+      - name: Install Docker packages on RHEL-based systems
+        ansible.builtin.package:
+          name:
+            - docker-ce 
+            - docker-ce-cli 
+            - containerd.io 
+            - docker-buildx-plugin 
+            - docker-compose-plugin
+          state: present   
+    when: ansible_os_family == "RedHat"
+
+  # ===== Common tasks for all systems =====
+  - name: Start and enable Docker service
+    ansible.builtin.systemd:
+      name: docker
+      state: started
+      enabled: yes
+      
+  - name: Add user to docker group (optional)
+    ansible.builtin.user:
+      name: "{{ ansible_user }}"
+      groups: docker
+      append: yes
+    when: ansible_user is defined and ansible_user != "root"
+    
+  - name: Install docker-compose standalone
+    ansible.builtin.shell: |
+      # Пытаемся получить последнюю версию, если не получается - используем фолбэк
+      LATEST_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "{{ fallback_docker_compose_version }}")
+      echo "Installing docker-compose version: $LATEST_VERSION"
+      curl -L "https://github.com/docker/compose/releases/download/${LATEST_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+      chmod +x /usr/local/bin/docker-compose
+    args:
+      executable: /bin/bash
+      
+  - name: Verify Docker installation
+    ansible.builtin.shell: |
+      docker --version
+      docker-compose --version
+    register: docker_version_output
+    
+  - name: Display Docker versions
+    debug:
+      var: docker_version_output.stdout_lines 

@@ -1,0 +1,35 @@
+---
+- name: Install docker + docker-compose
+  hosts: winassitrnr
+  become: yes
+  tasks:
+  # ... другие tasks остаются без изменений ...
+
+  - name: start docker
+    ansible.builtin.shell: |
+      sudo systemctl enable --now docker
+    args:
+      executable: /bin/bash
+
+  # Вариант 3: Простое использование latest
+  - name: Install docker-compose (latest version)
+    ansible.builtin.shell: |
+      LATEST_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+      sudo curl -L "https://github.com/docker/compose/releases/download/${LATEST_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+      sudo chmod +x /usr/local/bin/docker-compose
+    args:
+      executable: /bin/bash
+
+  # Вариант 4: Использование get_url с переменной (более надёжный)
+  - name: Get latest docker-compose release info
+    uri:
+      url: https://api.github.com/repos/docker/compose/releases/latest
+      return_content: yes
+    register: compose_release
+
+  - name: Download docker-compose
+    get_url:
+      url: "https://github.com/docker/compose/releases/download/{{ compose_release.json.tag_name }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
+      dest: /usr/local/bin/docker-compose
+      mode: '0755'
+      force: yes 

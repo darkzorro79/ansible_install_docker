@@ -1,0 +1,9 @@
+---
+# Вариант 5: Использование готовой роли из Ansible Galaxy
+collections:
+  - name: community.docker
+    version: ">=3.0.0"
+
+roles:
+  - name: geerlingguy.docker
+    version: ">=6.0.0" 

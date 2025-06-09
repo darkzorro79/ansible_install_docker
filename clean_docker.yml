@@ -1,0 +1,45 @@
+---
+- name: Clean old Docker installations
+  hosts: winassitrnr
+  become: yes
+  tasks:
+  - name: Stop Docker service if running
+    ansible.builtin.systemd:
+      name: docker
+      state: stopped
+    ignore_errors: yes
+    
+  - name: Remove Docker packages
+    ansible.builtin.apt:
+      pkg:
+        - docker.io
+        - docker-doc
+        - docker-compose
+        - podman-docker
+        - containerd
+        - runc
+      state: absent
+    when: ansible_os_family == "Debian"
+    ignore_errors: yes
+    
+  - name: Remove old Docker repository files
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/apt/sources.list.d/docker.list
+      - /etc/apt/keyrings/docker.gpg
+      - /usr/share/keyrings/docker-archive-keyring.gpg
+      - /usr/local/bin/docker-compose
+    when: ansible_os_family == "Debian"
+    
+  - name: Clean apt cache
+    ansible.builtin.apt:
+      update_cache: yes
+      autoclean: yes
+      autoremove: yes
+    when: ansible_os_family == "Debian"
+    
+  - name: Display cleanup status
+    debug:
+      msg: "Docker cleanup completed. Ready for fresh installation." 
